@@ -14,7 +14,7 @@ from ggshield.core.constants import CPU_COUNT
 from ggshield.core.git_shell import get_list_commit_SHA, is_git_dir
 from ggshield.core.text_utils import STYLE, display_error, format_text
 from ggshield.core.types import IgnoredMatch
-from ggshield.core.utils import ScanContext, handle_exception
+from ggshield.core.utils import ScanContext, handle_exception, profile_wrapper
 from ggshield.output import OutputHandler
 from ggshield.scan import Commit, Results, ScanCollection
 
@@ -108,7 +108,7 @@ def scan_commit_range(
 
         future_to_process = [
             executor.submit(
-                scan_commit,
+                profile_wrapper(scan_commit, "scan_commit"),
                 Commit(sha, exclusion_regexes),
                 client,
                 cache,

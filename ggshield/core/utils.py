@@ -1,10 +1,23 @@
+import cProfile
 import os
 import re
+import time
 import traceback
+import logging
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, List, NamedTuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Optional,
+    Type,
+    Union,
+)
 from urllib.parse import ParseResult, urlparse
 
 import click
@@ -16,6 +29,7 @@ from ggshield.core.constants import ON_PREMISE_API_URL_PATH_PREFIX
 from .git_shell import get_git_root, is_git_dir
 from .text_utils import Line, LineCategory, display_error, display_warning
 
+logger = logging.getLogger(__name__)
 
 REGEX_PATCH_HEADER = re.compile(
     r"^(?P<line_content>@@ -(?P<pre_index>\d+),?\d* \+(?P<post_index>\d+),?\d* @@(?: .+)?)"  # noqa
@@ -244,6 +258,7 @@ def handle_exception(e: Exception, verbose: bool) -> int:
     """
     Handle exception from a scan command.
     """
+    logging.error("exception=%s", str(e))
     if isinstance(e, click.exceptions.Abort):
         return 0
     elif isinstance(e, click.ClickException):
@@ -252,6 +267,64 @@ def handle_exception(e: Exception, verbose: bool) -> int:
         if verbose:
             traceback.print_exc()
         raise click.ClickException(str(e))
+
+
+PROFILE_DIR = os.getenv("GG_PROFILE_DIR")
+
+
+class ProfileWrapper:
+    enabled = PROFILE_DIR is not None
+
+    def __init__(self, prefix: str, callable: Callable):
+        self.prefix = prefix
+        # A unique ID to distinguish two calls. Can't use thread ID here since threads
+        # are often reused during scan.
+        self.unique_id = uuid.uuid4().hex
+        self.callable = callable
+        self.duration: Optional[int] = None
+
+    @staticmethod
+    def get_base_path() -> str:
+        assert PROFILE_DIR
+        return os.path.join(PROFILE_DIR, f"ggshield-{os.getpid()}")
+
+    def __call__(self, *args: Any, **kwargs: Dict[str, Any]) -> Any:
+        logger.debug(
+            "Starting thread prefix=%s unique_id=%s", self.prefix, self.unique_id
+        )
+
+        start = time.time()
+        pr = cProfile.Profile()
+        try:
+            pr.enable()
+            return self.callable(*args, **kwargs)
+        finally:
+            pr.disable()
+            self.duration = int((time.time() - start) * 1000)
+            logger.debug(
+                "Ending thread prefix=%s unique_id=%s duration=%dms",
+                self.prefix,
+                self.unique_id,
+                self.duration,
+            )
+            assert PROFILE_DIR
+            profile_path = (
+                ProfileWrapper.get_base_path()
+                + f"-{self.prefix}-{self.unique_id}.profile"
+            )
+            pr.dump_stats(profile_path)
+
+
+def profile_wrapper(
+    fcn: Callable, prefix: str, wrapper_class: Type[ProfileWrapper] = ProfileWrapper
+) -> Callable:
+    """Wraps a function call to profile it. Useful to profile a function called from
+    another thread"""
+
+    if not ProfileWrapper.enabled:
+        return fcn
+
+    return wrapper_class(prefix, fcn)
 
 
 def load_dot_env() -> None:

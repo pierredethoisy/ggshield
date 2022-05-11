@@ -1,13 +1,15 @@
 import concurrent.futures
+import json
 import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from queue import Queue
 from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Set, Tuple
 
 from pygitguardian import GGClient
 from pygitguardian.config import DOCUMENT_SIZE_THRESHOLD_BYTES, MULTI_DOCUMENT_LIMIT
-from pygitguardian.models import Detail, ScanResult
+from pygitguardian.models import Detail, MultiScanResult, ScanResult
 
 from ggshield.core.cache import Cache
 from ggshield.core.constants import CPU_COUNT
@@ -18,9 +20,15 @@ from ggshield.core.filter import (
     remove_results_from_ignore_detectors,
 )
 from ggshield.core.git_shell import GIT_PATH, shell
-from ggshield.core.text_utils import STYLE, format_text
+from ggshield.core.text_utils import STYLE, display_info, format_text
 from ggshield.core.types import IgnoredMatch
-from ggshield.core.utils import REGEX_HEADER_INFO, Filemode, ScanContext
+from ggshield.core.utils import (
+    REGEX_HEADER_INFO,
+    Filemode,
+    ScanContext,
+    ProfileWrapper,
+    profile_wrapper,
+)
 
 from ..iac.models import IaCScanResult
 from .scannable_errors import handle_scan_chunk_error
@@ -218,6 +226,51 @@ class CommitFile(File):
         self.filemode = filemode
 
 
+class ScanProfileWrapper(ProfileWrapper):
+    result_queue: Queue = Queue()
+
+    def __call__(self, *args: Any, **kwargs: Dict[str, Any]) -> Any:
+        result = super(ScanProfileWrapper, self).__call__(*args, **kwargs)
+
+        documents, _ = args
+
+        def create_document(doc: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                "filename": doc["filename"],
+                "size": len(doc["document"]),
+            }
+
+        scan = {
+            "scan_id": self.unique_id,
+            "document_count": len(documents),
+            "duration": self.duration,
+            "documents": [create_document(x) for x in documents],
+        }
+
+        if isinstance(result, MultiScanResult):
+            documents_with_secrets = []
+            for document, scan_result in zip(documents, result.scan_results):
+                if scan_result.has_secrets:
+                    documents_with_secrets.append(document["filename"])
+
+            scan["documents_with_secrets"] = documents_with_secrets
+            scan["secret_count"] = len(documents_with_secrets)
+        else:
+            scan["error"] = result.to_dict()
+        ScanProfileWrapper.result_queue.put(scan)
+        return result
+
+    @staticmethod
+    def dump_queue() -> None:
+        scans = []
+        while not ScanProfileWrapper.result_queue.empty():
+            scans.append(ScanProfileWrapper.result_queue.get())
+        path = Path(ProfileWrapper.get_base_path() + ".json")
+        with open(path, "w") as f:
+            json.dump(scans, f, indent=2)
+        display_info(f"Scan profiling summary saved in {path}")
+
+
 class Files:
     """
     Files is a list of files. Useful for directory scanning.
@@ -277,7 +330,9 @@ class Files:
         ) as executor:
             future_to_scan = {
                 executor.submit(
-                    client.multi_content_scan,
+                    profile_wrapper(
+                        client.multi_content_scan, "Files.scan", ScanProfileWrapper
+                    ),
                     chunk,
                     headers,
                 ): chunk
