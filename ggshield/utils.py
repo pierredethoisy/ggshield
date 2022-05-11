@@ -1,8 +1,11 @@
+import cProfile
+import functools
 import os
 import re
+import threading
 import traceback
 from enum import Enum
-from typing import Iterable, List, NamedTuple, Optional
+from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional
 
 import click
 import urllib3
@@ -279,3 +282,25 @@ def handle_exception(e: Exception, verbose: bool) -> int:
         if verbose:
             traceback.print_exc()
         raise click.ClickException(str(e))
+
+
+PROFILE_DIR = os.getenv("GG_PROFILE_DIR", ".")
+
+
+def profile_wrapper(fcn: Callable) -> Callable:
+    """Wraps a function call to profile it. Useful to profile a function called from
+    another thread"""
+
+    def inner(fcn: Callable, *args: Any, **kwargs: Dict[str, Any]) -> Any:
+        pr = cProfile.Profile()
+        try:
+            pr.enable()
+            return fcn(*args, **kwargs)
+        finally:
+            pr.disable()
+            profile_path = os.path.join(
+                PROFILE_DIR, f"out-{threading.current_thread().ident}.profile"
+            )
+            pr.dump_stats(profile_path)
+
+    return functools.partial(inner, fcn)

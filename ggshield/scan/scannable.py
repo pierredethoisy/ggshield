@@ -16,7 +16,7 @@ from ggshield.filter import (
 )
 from ggshield.git_shell import GIT_PATH, shell
 from ggshield.text_utils import STYLE, format_text
-from ggshield.utils import REGEX_HEADER_INFO, Filemode
+from ggshield.utils import REGEX_HEADER_INFO, Filemode, profile_wrapper
 
 from .scannable_errors import handle_scan_error
 
@@ -132,7 +132,7 @@ class Files:
         ) as executor:
             future_to_scan = {
                 executor.submit(
-                    client.multi_content_scan,
+                    profile_wrapper(client.multi_content_scan),
                     chunk,
                     {"mode": mode_header},
                 ): chunk

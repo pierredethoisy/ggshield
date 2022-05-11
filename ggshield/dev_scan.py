@@ -17,7 +17,8 @@ from ggshield.output import OutputHandler
 from ggshield.path import get_files_from_paths
 from ggshield.scan import Commit, Files, Result, ScanCollection
 from ggshield.text_utils import STYLE, format_text
-from ggshield.utils import REGEX_GIT_URL, SupportedScanMode, handle_exception
+from ggshield.utils import REGEX_GIT_URL, SupportedScanMode, handle_exception, \
+    profile_wrapper
 
 
 @contextmanager
@@ -238,7 +239,7 @@ def scan_commit_range(
     ) as executor:
         future_to_process = [
             executor.submit(
-                scan_commit,
+                profile_wrapper(scan_commit),
                 Commit(sha, exclusion_regexes),
                 client,
                 cache,
