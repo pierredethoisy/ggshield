@@ -1,4 +1,5 @@
 import _thread as thread
+import logging
 import os
 import sys
 import threading
@@ -86,6 +87,7 @@ def prereceive_cmd(ctx: click.Context, web: bool, prereceive_args: List[str]) ->
     """
     scan as a pre-receive git hook.
     """
+    logging.info("start prereceive_args=%s", str(prereceive_args))
     config = ctx.obj["config"]
     output_handler = ctx.obj["output_handler"]
 
@@ -101,6 +103,7 @@ def prereceive_cmd(ctx: click.Context, web: bool, prereceive_args: List[str]) ->
     if len(args) < 3:
         raise click.ClickException(f"Invalid input arguments: {args}")
 
+    logging.info("args=%s", str(args))
     before, after, *_ = args
     commit_list = []
 
@@ -147,6 +150,7 @@ def prereceive_cmd(ctx: click.Context, web: bool, prereceive_args: List[str]) ->
 
     try:
         with ExitAfter(get_prereceive_timeout()):
+            logging.info("Starting len(commit_list)=%d", len(commit_list))
             return_code = scan_commit_range(
                 client=ctx.obj["client"],
                 cache=ctx.obj["cache"],
@@ -160,6 +164,7 @@ def prereceive_cmd(ctx: click.Context, web: bool, prereceive_args: List[str]) ->
                 mode_header=SupportedScanMode.PRE_RECEIVE.value,
                 banlisted_detectors=config.banlisted_detectors,
             )
+            logging.info("Finished return_code=%d", return_code)
             if return_code:
                 click.echo(
                     """Rewrite your git history to delete evidence of your secrets.
@@ -174,6 +179,7 @@ Use it carefully: if those secrets are false positives and you still want your p
                 )
             return return_code
     except TimeoutError:
+        logging.error("Hit timeout")
         return 0
     except Exception as error:
         return handle_exception(error, config.verbose)

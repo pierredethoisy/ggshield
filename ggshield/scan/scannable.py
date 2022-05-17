@@ -132,7 +132,7 @@ class Files:
         ) as executor:
             future_to_scan = {
                 executor.submit(
-                    profile_wrapper(client.multi_content_scan),
+                    profile_wrapper(client.multi_content_scan, "Files.scan"),
                     chunk,
                     {"mode": mode_header},
                 ): chunk

@@ -239,7 +239,7 @@ def scan_commit_range(
     ) as executor:
         future_to_process = [
             executor.submit(
-                profile_wrapper(scan_commit),
+                profile_wrapper(scan_commit, "scan_commit"),
                 Commit(sha, exclusion_regexes),
                 client,
                 cache,

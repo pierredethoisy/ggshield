@@ -1,5 +1,6 @@
 import cProfile
 import functools
+import logging
 import os
 import re
 import threading
@@ -274,6 +275,7 @@ def handle_exception(e: Exception, verbose: bool) -> int:
     """
     Handle exception from a scan command.
     """
+    logging.error("exception=%s", str(e))
     if isinstance(e, click.exceptions.Abort):
         return 0
     elif isinstance(e, click.ClickException):
@@ -286,8 +288,12 @@ def handle_exception(e: Exception, verbose: bool) -> int:
 
 PROFILE_DIR = os.getenv("GG_PROFILE_DIR", ".")
 
+PROFILE_PREFIX = os.path.join(PROFILE_DIR, f"ggshield-{os.getpid()}")
 
-def profile_wrapper(fcn: Callable) -> Callable:
+LOG_FORMAT = "%(relativeCreated)06d:%(levelname)s:%(thread)d:%(name)s:%(filename)s:%(lineno)d: %(message)s"
+
+
+def profile_wrapper(fcn: Callable, prefix: str) -> Callable:
     """Wraps a function call to profile it. Useful to profile a function called from
     another thread"""
 
@@ -298,9 +304,11 @@ def profile_wrapper(fcn: Callable) -> Callable:
             return fcn(*args, **kwargs)
         finally:
             pr.disable()
-            profile_path = os.path.join(
-                PROFILE_DIR, f"out-{threading.current_thread().ident}.profile"
-            )
+            profile_path = f"{PROFILE_PREFIX}-{prefix}-{threading.current_thread().ident}.profile"
             pr.dump_stats(profile_path)
 
     return functools.partial(inner, fcn)
+
+
+def setup_logger():
+    logging.basicConfig(filename=f"{PROFILE_PREFIX}.log", level=logging.DEBUG, format=LOG_FORMAT)

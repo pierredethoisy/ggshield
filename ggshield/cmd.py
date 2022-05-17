@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import logging
 import os
 import sys
 from typing import Any, List, Optional, Type, cast
@@ -22,7 +23,9 @@ from .text_utils import display_error
 from .utils import (
     IGNORED_DEFAULT_PATTERNS,
     json_output_option_decorator,
+    profile_wrapper,
     retrieve_client,
+    setup_logger,
 )
 
 
@@ -234,7 +237,14 @@ def cli_wrapper(args: Optional[List[str]] = None) -> Any:
     `args` is only used by unit-tests.
     """
     show_crash_log = os.getenv("GITGUARDIAN_CRASH_LOG", "False").lower() == "true"
-    return cli.main(args, prog_name="ggshield", standalone_mode=not show_crash_log)
+    setup_logger()
+    try:
+        logging.info("start args=%s", str(sys.argv[1:]))
+        return_code = profile_wrapper(cli.main, "main")(args, prog_name="ggshield", standalone_mode=not show_crash_log)
+        logging.info("return_code=%d", return_code)
+        return return_code
+    finally:
+        logging.info("stop")
 
 
 if __name__ == "__main__":
