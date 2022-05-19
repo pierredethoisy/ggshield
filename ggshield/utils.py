@@ -4,7 +4,9 @@ import logging
 import os
 import re
 import threading
+import time
 import traceback
+import uuid
 from enum import Enum
 from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional
 
@@ -298,13 +300,18 @@ def profile_wrapper(fcn: Callable, prefix: str) -> Callable:
     another thread"""
 
     def inner(fcn: Callable, *args: Any, **kwargs: Dict[str, Any]) -> Any:
+        unique_id = uuid.uuid4().hex
+        logging.info("Starting thread prefix=%s unique_id=%s", prefix, unique_id)
+        start = time.time()
         pr = cProfile.Profile()
         try:
             pr.enable()
             return fcn(*args, **kwargs)
         finally:
             pr.disable()
-            profile_path = f"{PROFILE_PREFIX}-{prefix}-{threading.current_thread().ident}.profile"
+            duration = int((time.time() - start) * 1000)
+            logging.info("Ending thread prefix=%s unique_id=%s duration=%dms", prefix, unique_id, duration)
+            profile_path = f"{PROFILE_PREFIX}-{prefix}-{unique_id}.profile"
             pr.dump_stats(profile_path)
 
     return functools.partial(inner, fcn)
