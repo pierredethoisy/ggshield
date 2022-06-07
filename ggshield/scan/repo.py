@@ -67,6 +67,8 @@ def scan_commit(
     all_policies: bool,
     banlisted_detectors: Optional[Set[str]] = None,
 ) -> ScanCollection:  # pragma: no cover
+    if verbose:
+        click.echo(f"\nScanning {commit.sha}", err=True)
     results = commit.scan(
         client=client,
         cache=cache,
