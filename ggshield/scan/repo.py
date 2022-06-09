@@ -12,7 +12,7 @@ from ggshield.core.cache import Cache
 from ggshield.core.config import Config
 from ggshield.core.constants import CPU_COUNT
 from ggshield.core.git_shell import get_list_commit_SHA, is_git_dir
-from ggshield.core.text_utils import STYLE, format_text
+from ggshield.core.text_utils import STYLE, display_error, format_text
 from ggshield.core.types import IgnoredMatch
 from ggshield.core.utils import SupportedScanMode, handle_exception
 from ggshield.output import OutputHandler
@@ -69,14 +69,18 @@ def scan_commit(
 ) -> ScanCollection:  # pragma: no cover
     if verbose:
         click.echo(f"\nScanning {commit.sha}", err=True)
-    results = commit.scan(
-        client=client,
-        cache=cache,
-        matches_ignore=matches_ignore,
-        all_policies=all_policies,
-        mode_header=SupportedScanMode.REPO.value,
-        banlisted_detectors=banlisted_detectors,
-    )
+    try:
+        results = commit.scan(
+            client=client,
+            cache=cache,
+            matches_ignore=matches_ignore,
+            all_policies=all_policies,
+            mode_header=SupportedScanMode.REPO.value,
+            banlisted_detectors=banlisted_detectors,
+        )
+    except Exception as exc:
+        display_error(f"Failed to scan {commit.sha}: {exc}")
+        raise
 
     return ScanCollection(
         commit.sha or "unknown",
