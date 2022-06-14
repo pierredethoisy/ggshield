@@ -15,13 +15,22 @@ from ggshield.core.filter import (
     remove_ignored_from_result,
     remove_results_from_banlisted_detectors,
 )
-from ggshield.core.git_shell import GIT_PATH, shell
+from ggshield.core.git_shell import GIT_PATH, shell_as_bytes
 from ggshield.core.text_utils import STYLE, format_text
 from ggshield.core.types import IgnoredMatch
 from ggshield.core.utils import REGEX_HEADER_INFO, Filemode
 
 from ..core.extra_headers import get_extra_headers
 from .scannable_errors import handle_scan_error
+
+
+def _decode(raw_document: bytes) -> str:
+    """Decode a byte-based document using our own replacement rules"""
+    return (
+        raw_document.decode(errors="replace")
+        .replace("\0", " ")  # errors="replace" keeps `\0`, remove it
+        .replace("\uFFFD", " ")  # replacement character
+    )
 
 
 class Result(NamedTuple):
@@ -69,11 +78,7 @@ class File:
 
     @staticmethod
     def from_bytes(raw_document: bytes, filename: str) -> "File":
-        document = (
-            raw_document.decode(errors="replace")
-            .replace("\0", " ")  # errors="replace" keeps `\0`, remove it
-            .replace("\uFFFD", " ")  # replacement character
-        )
+        document = _decode(raw_document)
         return File(document, filename)
 
     @property
@@ -234,9 +239,10 @@ class Commit(Files):
         """Get the change patch for the commit."""
         if self._patch is None:
             if self.sha:
-                self._patch = shell([GIT_PATH, "show", self.sha])
+                cmd = [GIT_PATH, "show", self.sha]
             else:
-                self._patch = shell([GIT_PATH, "diff", "--cached"])
+                cmd = [GIT_PATH, "diff", "--cached"]
+            self._patch = _decode(shell_as_bytes(cmd))
 
         return self._patch
 

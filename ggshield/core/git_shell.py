@@ -80,8 +80,9 @@ def check_git_installed() -> None:
             raise click.ClickException("Git is not installed.")
 
 
-def shell(command: List[str], timeout: int = COMMAND_TIMEOUT) -> str:
-    """Execute a command in a subprocess."""
+def shell_as_bytes(command: List[str], timeout: int = COMMAND_TIMEOUT) -> bytes:
+    """Execute a command in a subprocess.
+    Returns stdout as bytes."""
     env = os.environ.copy()
     env["LANG"] = "C"
 
@@ -94,7 +95,7 @@ def shell(command: List[str], timeout: int = COMMAND_TIMEOUT) -> str:
             timeout=timeout,
             env=env,
         )
-        return result.stdout.decode("utf-8", errors="ignore").rstrip()
+        return result.stdout
     except subprocess.CalledProcessError:
         pass
     except subprocess.TimeoutExpired:
@@ -104,7 +105,13 @@ def shell(command: List[str], timeout: int = COMMAND_TIMEOUT) -> str:
             f"Unhandled exception: {' '.join(command)}\n\t{str(exc)}"
         )
 
-    return ""
+    return b""
+
+
+def shell(command: List[str], timeout: int = COMMAND_TIMEOUT) -> str:
+    """Execute a command in a subprocess.
+    Return stdout as a string (assumes it is UTF-8)"""
+    return shell_as_bytes(command, timeout).decode("utf-8", errors="ignore").rstrip()
 
 
 def shell_split(command: List[str], **kwargs: Any) -> List[str]:
