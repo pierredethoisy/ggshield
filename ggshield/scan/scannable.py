@@ -8,12 +8,12 @@ from queue import Queue
 from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Set, Tuple
 
 from pygitguardian import GGClient
-from pygitguardian.config import DOCUMENT_SIZE_THRESHOLD_BYTES, MULTI_DOCUMENT_LIMIT
+from pygitguardian.config import DOCUMENT_SIZE_THRESHOLD_BYTES
 from pygitguardian.models import Detail, MultiScanResult, ScanResult
 
 from ggshield.core.cache import Cache
-from ggshield.core.constants import CPU_COUNT
 from ggshield.core.extra_headers import get_headers
+from ggshield.core.constants import MAX_DOC_LIMIT, MAX_SCAN_WORKERS
 from ggshield.core.filter import (
     is_filepath_excluded,
     remove_ignored_from_result,
@@ -320,13 +320,13 @@ class Files:
         results = []
         errors = []
         chunks = []
-        for i in range(0, len(scannable_list), MULTI_DOCUMENT_LIMIT):
-            chunks.append(scannable_list[i : i + MULTI_DOCUMENT_LIMIT])
+        for i in range(0, len(scannable_list), MAX_DOC_LIMIT):
+            chunks.append(scannable_list[i : i + MAX_DOC_LIMIT])
 
         headers = get_headers(scan_context)
 
         with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(CPU_COUNT, 4), thread_name_prefix="content_scan"
+            max_workers=MAX_SCAN_WORKERS, thread_name_prefix="content_scan"
         ) as executor:
             future_to_scan = {
                 executor.submit(
