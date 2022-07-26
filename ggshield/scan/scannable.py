@@ -12,8 +12,8 @@ from pygitguardian.config import DOCUMENT_SIZE_THRESHOLD_BYTES
 from pygitguardian.models import Detail, MultiScanResult, ScanResult
 
 from ggshield.core.cache import Cache
+from ggshield.core.constants import MAX_COMMIT_WORKERS, MAX_DOC_LIMIT, MAX_SCAN_WORKERS
 from ggshield.core.extra_headers import get_headers
-from ggshield.core.constants import MAX_DOC_LIMIT, MAX_SCAN_WORKERS
 from ggshield.core.filter import (
     is_filepath_excluded,
     remove_ignored_from_result,
@@ -25,8 +25,8 @@ from ggshield.core.types import IgnoredMatch
 from ggshield.core.utils import (
     REGEX_HEADER_INFO,
     Filemode,
-    ScanContext,
     ProfileWrapper,
+    ScanContext,
     profile_wrapper,
 )
 
@@ -261,13 +261,28 @@ class ScanProfileWrapper(ProfileWrapper):
         return result
 
     @staticmethod
-    def dump_queue() -> None:
+    def dump_queue(total_duration: int) -> None:
         scans = []
         while not ScanProfileWrapper.result_queue.empty():
             scans.append(ScanProfileWrapper.result_queue.get())
         path = Path(ProfileWrapper.get_base_path() + ".json")
+
+        total_secret_count = sum(x["secret_count"] for x in scans)
+
+        summary = {
+            "parameters": {
+                "commit_workers": MAX_COMMIT_WORKERS,
+                "scan_workers": MAX_SCAN_WORKERS,
+                "doc_limit": MAX_DOC_LIMIT,
+            },
+            "total_duration": total_duration,
+            "total_secret_count": total_secret_count,
+            "scan_count": len(scans),
+            "scans": scans,
+        }
+
         with open(path, "w") as f:
-            json.dump(scans, f, indent=2)
+            json.dump(summary, f, indent=2)
         display_info(f"Scan profiling summary saved in {path}")
 
 

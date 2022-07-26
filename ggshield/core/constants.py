@@ -8,9 +8,6 @@ def getint(name: str, default: int) -> int:
     return int(value) if value is not None else default
 
 
-# max file size to accept
-MAX_FILE_SIZE = 1048576
-
 # max number of documents to send in a single chunk
 MAX_DOC_LIMIT = getint("GG_DOC_LIMIT", MULTI_DOCUMENT_LIMIT)
 assert (
