@@ -2,7 +2,11 @@ import os
 
 
 # max file size to accept
-MAX_FILE_SIZE = 1048576
+try:
+    MAX_FILE_SIZE = int(os.environ["GG_MAX_FILE_SIZE"])
+except KeyError:
+    MAX_FILE_SIZE = 10 * 1024 * 1024
+
 # max files size to create a tar from
 MAX_TAR_CONTENT_SIZE = 30 * 1024 * 1024
 

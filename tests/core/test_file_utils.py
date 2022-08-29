@@ -3,6 +3,7 @@ from typing import Callable
 
 import pytest
 
+from ggshield.core.constants import MAX_FILE_SIZE
 from ggshield.core.file_utils import generate_files_from_paths
 
 
@@ -39,7 +40,7 @@ def test_generate_files_from_paths(
     ["filename", "creator"],
     [
         ("a_binary_file.tar", lambda x: x.write_text("Uninteresting")),
-        ("big_file", lambda x: x.write_text(2_000_000 * " ")),
+        ("big_file", lambda x: x.write_text((MAX_FILE_SIZE + 12) * " ")),
         ("i_am_a_dir", lambda x: x.mkdir()),
     ],
 )
