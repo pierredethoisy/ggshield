@@ -1,11 +1,10 @@
 import os
 
+import pygitguardian.config
+
 
 # max file size to accept
-try:
-    MAX_FILE_SIZE = int(os.environ["GG_MAX_FILE_SIZE"])
-except KeyError:
-    MAX_FILE_SIZE = 10 * 1024 * 1024
+MAX_FILE_SIZE = pygitguardian.config.DOCUMENT_SIZE_THRESHOLD_BYTES
 
 # max files size to create a tar from
 MAX_TAR_CONTENT_SIZE = 30 * 1024 * 1024

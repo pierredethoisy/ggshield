@@ -96,7 +96,9 @@ def generate_files_from_paths(paths: Iterable[str], verbose: bool) -> Iterator[F
         file_size = os.path.getsize(path)
         if file_size > MAX_FILE_SIZE:
             if verbose:
-                click.echo(f"ignoring file over 1MB: {path}", err=True)
+                click.echo(
+                    f"ignoring file over {MAX_FILE_SIZE:,} bytes: {path}", err=True
+                )
             continue
         if path.endswith(BINARY_FILE_EXTENSIONS):
             if verbose:
