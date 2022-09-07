@@ -8,6 +8,8 @@ def getint(name: str, default: int) -> int:
     return int(value) if value is not None else default
 
 
+PROFILE_DIR = os.getenv("GG_PROFILE_DIR")
+
 # max number of documents to send in a single chunk
 MAX_DOC_LIMIT = getint("GG_DOC_LIMIT", MULTI_DOCUMENT_LIMIT)
 assert (

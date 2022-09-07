@@ -21,7 +21,7 @@ from ggshield.cmd.status import status_cmd
 from ggshield.core.cache import Cache
 from ggshield.core.config import Config
 from ggshield.core.text_utils import display_warning
-from ggshield.core.utils import load_dot_env, profile_wrapper
+from ggshield.core.utils import load_dot_env
 from ggshield.scan.scannable import ScanProfileWrapper
 
 
@@ -162,9 +162,7 @@ def main(args: Optional[List[str]] = None) -> Any:
     `args` is only used by unit-tests.
     """
     show_crash_log = os.getenv("GITGUARDIAN_CRASH_LOG", "False").lower() == "true"
-    return profile_wrapper(cli.main, "main")(
-        args, prog_name="ggshield", standalone_mode=not show_crash_log
-    )
+    return cli.main(args, prog_name="ggshield", standalone_mode=not show_crash_log)
 
 
 if __name__ == "__main__":

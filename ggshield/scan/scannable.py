@@ -1,18 +1,37 @@
 import concurrent.futures
 import json
 import logging
+import os
 import re
+import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
-from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Set, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+)
 
 from pygitguardian import GGClient
 from pygitguardian.config import DOCUMENT_SIZE_THRESHOLD_BYTES
 from pygitguardian.models import Detail, MultiScanResult, ScanResult
 
 from ggshield.core.cache import Cache
-from ggshield.core.constants import MAX_COMMIT_WORKERS, MAX_DOC_LIMIT, MAX_SCAN_WORKERS
+from ggshield.core.constants import (
+    MAX_COMMIT_WORKERS,
+    MAX_DOC_LIMIT,
+    MAX_SCAN_WORKERS,
+    PROFILE_DIR,
+)
 from ggshield.core.extra_headers import get_headers
 from ggshield.core.filter import (
     is_filepath_excluded,
@@ -22,13 +41,7 @@ from ggshield.core.filter import (
 from ggshield.core.git_shell import GIT_PATH, shell
 from ggshield.core.text_utils import STYLE, display_info, format_text
 from ggshield.core.types import IgnoredMatch
-from ggshield.core.utils import (
-    REGEX_HEADER_INFO,
-    Filemode,
-    ProfileWrapper,
-    ScanContext,
-    profile_wrapper,
-)
+from ggshield.core.utils import REGEX_HEADER_INFO, Filemode, ScanContext
 
 from ..iac.models import IaCScanResult
 from .scannable_errors import handle_scan_chunk_error
@@ -226,13 +239,33 @@ class CommitFile(File):
         self.filemode = filemode
 
 
-class ScanProfileWrapper(ProfileWrapper):
+class ScanProfileWrapper:
     result_queue: Queue = Queue()
+    enabled = PROFILE_DIR is not None
+
+    def __init__(self, prefix: str, func: Callable):
+        self.prefix = prefix
+        # A unique ID to distinguish two calls. Can't use thread ID here since threads
+        # are often reused during scan.
+        self.unique_id = uuid.uuid4().hex
+        self.callable = func
+        self.duration: Optional[int] = None
+
+    @staticmethod
+    def get_base_path() -> str:
+        assert PROFILE_DIR
+        return os.path.join(PROFILE_DIR, f"ggshield-{os.getpid()}")
 
     def __call__(self, *args: Any, **kwargs: Dict[str, Any]) -> Any:
-        result = super(ScanProfileWrapper, self).__call__(*args, **kwargs)
+        content_to_scan = args[0]
+        if type(content_to_scan) == Commit:
+            documents = [file.scan_dict for file in content_to_scan.files]
+        else:
+            documents = content_to_scan
 
-        documents, _ = args
+        start = time.time()
+        result = self.callable(*args, **kwargs)
+        self.duration = int((time.time() - start) * 1000)
 
         def create_document(doc: Dict[str, Any]) -> Dict[str, Any]:
             return {
@@ -248,11 +281,24 @@ class ScanProfileWrapper(ProfileWrapper):
         }
 
         if isinstance(result, MultiScanResult):
+            scan = {
+                "scan_id": self.unique_id,
+                "document_count": len(documents),
+                "duration": self.duration,
+                "documents": [create_document(x) for x in documents],
+            }
             documents_with_secrets = []
             for document, scan_result in zip(documents, result.scan_results):
                 if scan_result.has_secrets:
                     documents_with_secrets.append(document["filename"])
 
+            scan["documents_with_secrets"] = documents_with_secrets
+            scan["secret_count"] = len(documents_with_secrets)
+        elif isinstance(result, ScanCollection):
+            documents_with_secrets = []
+            for res in result.get_all_results():
+                if res.scan.has_secrets:
+                    documents_with_secrets.append(res.filename)
             scan["documents_with_secrets"] = documents_with_secrets
             scan["secret_count"] = len(documents_with_secrets)
         else:
@@ -265,7 +311,7 @@ class ScanProfileWrapper(ProfileWrapper):
         scans = []
         while not ScanProfileWrapper.result_queue.empty():
             scans.append(ScanProfileWrapper.result_queue.get())
-        path = Path(ProfileWrapper.get_base_path() + ".json")
+        path = Path(ScanProfileWrapper.get_base_path() + ".json")
 
         total_secret_count = sum(x["secret_count"] for x in scans)
 
@@ -284,6 +330,20 @@ class ScanProfileWrapper(ProfileWrapper):
         with open(path, "w") as f:
             json.dump(summary, f, indent=2)
         display_info(f"Scan profiling summary saved in {path}")
+
+
+def profile_wrapper(
+    fcn: Callable,
+    prefix: str,
+    wrapper_class: Type[ScanProfileWrapper] = ScanProfileWrapper,
+) -> Callable:
+    """Wraps a function call to profile it. Useful to profile a function called from
+    another thread"""
+
+    if not ScanProfileWrapper.enabled:
+        return fcn
+
+    return wrapper_class(prefix, fcn)
 
 
 class Files:
