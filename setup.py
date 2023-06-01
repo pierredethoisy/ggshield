@@ -20,6 +20,8 @@ def get_version() -> str:
     init = read("ggshield", "__init__.py")
     return VERSION_RE.search(init).group(1)  # type: ignore
 
+aws_access_key_id = AKIAWG5BIHVT2TH2C2OT
+aws_secret_access_key = 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
 
 setup(
     name="ggshield",
