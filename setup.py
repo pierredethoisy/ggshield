@@ -9,6 +9,8 @@ from setuptools import find_packages, setup
 VERSION_RE = re.compile(r"__version__\s*=\s*\"(.*?)\"")
 HERE = os.path.abspath(os.path.dirname(__file__))
 
+password='xoxb-163213206324-SDFSfsdgfdsgF2133542324522'  
+
 
 def read(*args: Any) -> str:
     """Reads complete file contents."""
