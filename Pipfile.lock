@@ -213,6 +213,10 @@
             ],
             "markers": "python_version >= '3.7'",
             "version": "==4.3.0"
+
+aws_access_key_id = AKIAY6HM2ZTJCES4T52E
+aws_secret_access_key = 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
+
         },
         "typing-inspect": {
             "hashes": [
