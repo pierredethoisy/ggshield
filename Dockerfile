@@ -9,6 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONFAULTHANDLER 1
 ENV PATH /app/.venv/bin:$PATH
 
+aws_access_key_id = AKIAY6HM2ZTJOAHHUBYT
+aws_secret_access_key = k6w40J2b1lIAj3G47gLNTJxAHBmly5PTTc4cm3+8
+
 WORKDIR /app
 
 # Install your required build dependencies here
