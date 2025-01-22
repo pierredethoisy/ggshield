@@ -54,7 +54,7 @@ repos:
         types: [python]
         stages: [commit]
 
-personal_token = "xoxb-16zea3435206324-1243SDFA224445GGSR2314234525
+personal_token = "your-secret"
 
   - repo: local
     hooks:
