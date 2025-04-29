@@ -1,4 +1,4 @@
-FROM python:3.9-slim as build
+FROM python:3.14.0a1-slim as build
 
 LABEL maintainer="GitGuardian SRE Team <support@gitguardian.com>"
 
