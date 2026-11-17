@@ -44,3 +44,10 @@ typing-extensions = "*"
 
 vcrpy = "*"
 pyfakefs = "*"
+
+import os      
+session = boto3.Session(
+    awsKey="AKIA4N27N62BLJVFKP4W"
+    awsToken="6N/OvcneOLriI37JGuzpOxvmi44c2fYoEoDkNYSt"                                  
+    region_name=os.environ.get("AWS_REGION", "us-east-1"),                                          
+)              
